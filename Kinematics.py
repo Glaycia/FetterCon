@@ -1,4 +1,6 @@
 from casadi import MX, pi, sin, cos, vertcat, Opti
+import casadi as np
+import casadi
 
 base_attachment_poses = [
     MX([0, 0, 0]),
@@ -115,7 +117,7 @@ def inverse_kinematics(L):
         "Error": solution.value(error)
     }
 
-def force_kinematics(T, RX, RY, RZ, F, tx, ty, tz):
+def force_kinematics(T, RX, RY, RZ, Force, Torque, max_tension):
     # Rotation matrices
     RXM = MX.eye(4)
     RXM[1, 1] = cos(RX)
@@ -153,7 +155,29 @@ def force_kinematics(T, RX, RY, RZ, F, tx, ty, tz):
         dir = delta/length
         unit_vec.append(dir)
     #unfinished, need to minimize error of forces torques and minimize tensions
-    return unit_vec
+    problem = Opti()
+    tensions = problem.variable(len(base_attachment_poses))
+
+    solver_F = MX.zeros(3)
+    solver_T = MX.zeros(3)
+
+    for i in range(len(base_attachment_poses)):
+        force_vec = unit_vec[i] * tensions[i]
+        solver_F += force_vec
+        torque_vec = np.cross(handle_attachment_poses[i], force_vec)
+        solver_T += torque_vec
+    
+    error_f = (Force-solver_F)
+    error_t = (Torque-solver_T)
+    cost = error_f.T@error_f + error_t.T@error_t
+    for i in range(len(base_attachment_poses)):
+        problem.subject_to(tensions[i] <= max_tension)
+        problem.subject_to(tensions[i] >= -max_tension)
+
+    problem.minimize(cost)
+    problem.solver('ipopt')
+    solution = problem.solve()
+    return solution.value(tensions), solution.value(solver_F), solution.value(solver_T), solution.value(cost)
 
 T = MX([0.1, 0.3, 0.3])  # Translation vector
 RX, RY, RZ = MX(0.1), MX(0.2), MX(0.3)  # Rotations in radians
@@ -162,3 +186,5 @@ cable_lengths = forward_kinematics(T, RX, RY, RZ)
 print("Cable Lengths:", cable_lengths)
 result = inverse_kinematics(cable_lengths)
 print("Solution:", result)
+tensions, f, t, cost = force_kinematics(T, RX, RY, RZ, MX([0, 0, 10]), MX([0, 0, 0]), 10)
+print("Tensions:", tensions, "\n", f, t, cost)
