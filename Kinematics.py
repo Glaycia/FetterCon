@@ -117,7 +117,7 @@ def inverse_kinematics(L):
         "Error": solution.value(error)
     }
 
-def force_kinematics(T, RX, RY, RZ, Force, Torque, max_tension):
+def force_kinematics(T, RX, RY, RZ, Force, Torque, max_tension, min_tension):
     # Rotation matrices
     RXM = MX.eye(4)
     RXM[1, 1] = cos(RX)
@@ -172,7 +172,7 @@ def force_kinematics(T, RX, RY, RZ, Force, Torque, max_tension):
     cost = error_f.T@error_f + error_t.T@error_t
     for i in range(len(base_attachment_poses)):
         problem.subject_to(tensions[i] <= max_tension)
-        problem.subject_to(tensions[i] >= -max_tension)
+        problem.subject_to(tensions[i] >= min_tension)
 
     problem.minimize(cost)
     problem.solver('ipopt')
@@ -186,5 +186,5 @@ cable_lengths = forward_kinematics(T, RX, RY, RZ)
 print("Cable Lengths:", cable_lengths)
 result = inverse_kinematics(cable_lengths)
 print("Solution:", result)
-tensions, f, t, cost = force_kinematics(T, RX, RY, RZ, MX([0, 0, 10]), MX([0, 0, 0]), 10)
+tensions, f, t, cost = force_kinematics(T, RX, RY, RZ, MX([0, 0, 10]), MX([0, 0, 0]), 10, 1)
 print("Tensions:", tensions, "\n", f, t, cost)
