@@ -13,7 +13,7 @@ def generateCircle(R, Z, mass, N, max_force):
     problem.subject_to(dt > 0.001)
     for k in range(N+1):
         angle = k * 2 * numpy.pi/N
-        problem.subject_to(poses[:, k] == MX([R*cos(angle), R*sin(angle), Z]))
+        problem.subject_to(poses[:, k] == MX([R*cos(angle) +0.5, R*sin(angle)+0.5, Z]))
     for k in range(N):
         problem.subject_to(poses[:, k+1] == poses[:, k] + dt*velocities[:, k] + dt**2/2*(accelerations[:, k]-9.81))
         problem.subject_to(velocities[:, k+1] == velocities[:, k] + dt*accelerations[:, k])
@@ -104,7 +104,7 @@ def plot_3d_video_with_imageio(pose_array, force_array, dt, output_filename="3d_
             raise ValueError("Buffer is empty. Ensure the figure is correctly rendered.")
         
         image = numpy.frombuffer(buffer, dtype='uint8')
-        image = image.reshape((height*2, width*2, 4))  # Use actual dimensions from canvas
+        image = image.reshape((height, width, 4))  # Use actual dimensions from canvas
 
         # Append the frame
         frames.append(image)
