@@ -234,6 +234,14 @@ def plot_3d_strings_with_transformation(tensions, T, RX, RY, RZ):
         ax.scatter(*base, color='red', s=50, label='Base' if i == 0 else "")
         ax.scatter(*handle, color='blue', s=50, label='Handle' if i == 0 else "")
     
+    norm = plt.Normalize(vmin=numpy.min(tensions), vmax=numpy.max(tensions))
+    sm = plt.cm.ScalarMappable(cmap='viridis', norm=norm)
+    sm.set_array([])  # Needed for colorbar to work
+
+    # Add the colorbar to the plot
+    cbar = plt.colorbar(sm, ax=ax)
+    cbar.set_label('Tension (N)')
+               
     ax.set_title("3D Strings with Transformed Handle Poses")
     ax.set_xlabel("X-axis")
     ax.set_ylabel("Y-axis")
@@ -242,7 +250,7 @@ def plot_3d_strings_with_transformation(tensions, T, RX, RY, RZ):
     plt.show()
 
 T = [0.1, 0.3, 0.3]  # Translation vector
-RX, RY, RZ = MX(0.1), MX(0.2), MX(0.3)  # Rotations in radians
+RX, RY, RZ = MX(0.1), MX(0.2), MX(1.3)  # Rotations in radians
 
 cable_lengths = forward_kinematics(MX(T), RX, RY, RZ)
 print("Cable Lengths:", cable_lengths)
