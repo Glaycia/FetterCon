@@ -186,18 +186,17 @@ def transform_handle_poses(T, RX, RY, RZ, handle_poses):
     RYM = rotationYnp(RY)
     RZM = rotationZnp(RZ)
     R = RXM @ RYM @ RZM
-    print(R)
-    R[3, 0:3] = T
+    # print(R)
+    R[0:3, 3] = T.T
     transformed_poses = []
     for handle_pose in handle_poses:
-        handle_pose += [1]
-        # print(handle_pose)
-        # print(R)
-        handle_pose_mx = numpy.array([handle_pose])
-        # print(handle_pose_mx)
-        transformed = handle_pose_mx @ R
-        print(transformed)
-        transformed_poses.append(transformed[0, 0:3])
+        handle_pose4 = handle_pose + [1]
+        handle_pose_mx = numpy.array([handle_pose4]).T
+        # print("HMX", handle_pose_mx)
+        # print("R", R)
+        transformed = R@handle_pose_mx
+        # print("TR", transformed)
+        transformed_poses.append(transformed.T[0, 0:3])
     
     return transformed_poses
 
@@ -249,14 +248,15 @@ def plot_3d_strings_with_transformation(tensions, T, RX, RY, RZ):
     ax.legend()
     plt.show()
 
-T = [0.1, 0.3, 0.3]  # Translation vector
-RX, RY, RZ = MX(0.1), MX(0.2), MX(1.3)  # Rotations in radians
+if __name__ == "__main__":
+    T = [0.1, 0.3, 0.3]  # Translation vector
+    RX, RY, RZ = MX(0.1), MX(0.2), MX(1.3)  # Rotations in radians
 
-cable_lengths = forward_kinematics(MX(T), RX, RY, RZ)
-print("Cable Lengths:", cable_lengths)
-result = inverse_kinematics(cable_lengths)
-print("Solution:", result)
-tensions, f, t, cost = force_kinematics(MX(T), RX, RY, RZ, MX([0, 0, 0]), MX([0, 0, 0]), 10, 1)
-print("Tensions:", tensions, "\n", f, t, cost)
+    cable_lengths = forward_kinematics(MX(T), RX, RY, RZ)
+    print("Cable Lengths:", cable_lengths)
+    result = inverse_kinematics(cable_lengths)
+    print("Solution:", result)
+    tensions, f, t, cost = force_kinematics(MX(T), RX, RY, RZ, MX([0, 0, 0]), MX([0, 0, 0]), 10, 1)
+    print("Tensions:", tensions, "\n", f, t, cost)
 
-plot_3d_strings_with_transformation(tensions, numpy.array(T), RX, RY, RZ)
+    plot_3d_strings_with_transformation(tensions, numpy.array(T), RX, RY, RZ)
