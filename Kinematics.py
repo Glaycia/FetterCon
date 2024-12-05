@@ -7,18 +7,18 @@ from mpl_toolkits.mplot3d import Axes3D
 base_attachment_poses = [
     [0, 0, 0],
     [1, 0, 0],
-    [0, 0.5, 0],
+    [0.5, 1, 0],
     [0, 1, 1],
     [1, 1, 1],
-    [0, 0.5, 1]
+    [0.5, 0, 1]
 ]
 handle_attachment_poses = [
-    [0.02, 0.02, 0.02],
-    [-0.02, 0.02, 0.02],
-    [0.02, 0, 0.02],
-    [0.02, -0.02, -0.02],
-    [-0.02, -0.02, -0.02],
-    [0.02, 0, -0.02],
+    [0.1, 0.1, 0.1],
+    [-0.1, 0.1, 0.1],
+    [0, -0.1, 0.1],
+    [0.1, -0.1, -0.1],
+    [-0.1, -0.1, -0.1],
+    [0, 0.1, -0.1],
 ]
 def rotationX(angle):
     RXM = MX.eye(4)
@@ -142,7 +142,7 @@ def force_kinematics(T, RX, RY, RZ, Force, Torque, max_tension, min_tension):
     solver_T = MX.zeros(3)
 
     for i in range(len(base_attachment_poses)):
-        force_vec = unit_vec[i] * tensions[i]
+        force_vec = -unit_vec[i] * tensions[i]
         solver_F += force_vec
         torque_vec = np.cross(MX(handle_attachment_poses[i]), force_vec)
         solver_T += torque_vec
@@ -249,14 +249,14 @@ def plot_3d_strings_with_transformation(tensions, T, RX, RY, RZ):
     plt.show()
 
 if __name__ == "__main__":
-    T = [0.1, 0.3, 0.3]  # Translation vector
+    T = [0.5, 0.3, 0.8]  # Translation vector
     RX, RY, RZ = MX(0.1), MX(0.2), MX(1.3)  # Rotations in radians
 
     cable_lengths = forward_kinematics(MX(T), RX, RY, RZ)
     print("Cable Lengths:", cable_lengths)
     result = inverse_kinematics(cable_lengths)
     print("Solution:", result)
-    tensions, f, t, cost = force_kinematics(MX(T), RX, RY, RZ, MX([0, 0, 0]), MX([0, 0, 0]), 10, 1)
+    tensions, f, t, cost = force_kinematics(MX(T), RX, RY, RZ, MX([0, 0, 9.81]), MX([0, 0, 0]), 100, 1)
     print("Tensions:", tensions, "\n", f, t, cost)
 
     plot_3d_strings_with_transformation(tensions, numpy.array(T), RX, RY, RZ)
