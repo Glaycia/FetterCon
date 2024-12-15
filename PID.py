@@ -4,27 +4,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import imageio
 import numpy
 
-def generateCircle(R, Z, mass, N, max_force):
-    problem = Opti()
-    dt = problem.variable(1)/N
-    poses = problem.variable(3, N+1)
-    velocities = problem.variable(3, N + 1)
-    accelerations = problem.variable(3, N)
-    problem.subject_to(dt > 0.001)
-    for k in range(N+1):
-        angle = k * 2 * numpy.pi/N
-        problem.subject_to(poses[:, k] == MX([R*cos(angle), R*sin(angle), Z]))
-    for k in range(N):
-        problem.subject_to(poses[:, k+1] == poses[:, k] + dt*velocities[:, k] + dt**2/2*(accelerations[:, k]-9.81))
-        problem.subject_to(velocities[:, k+1] == velocities[:, k] + dt*accelerations[:, k])
-        problem.subject_to(accelerations[:, k].T @ accelerations[:, k] <= (max_force/mass)**2)
-    problem.minimize(dt)
-    problem.solver('ipopt')
-    solution = problem.solve()
-    return solution.value(poses), solution.value(accelerations) * mass, solution.value(dt)
 
-
-def plot_3d_video_with_imageio(pose_array, force_array, dt, output_filename="3d_string_animation.mp4"):
+def plot_3d_video_with_imageio(initial_pose, target_pose, mass, dt, output_filename="3d_string_animation.mp4"):
     """
     Generate a video of 3D strings over time using imageio.
 
@@ -34,28 +15,15 @@ def plot_3d_video_with_imageio(pose_array, force_array, dt, output_filename="3d_
     dt (float): Time step between frames.
     output_filename (str): Output video filename.
     """
-    num_frames = pose_array.shape[1]
-    base_poses = [
-        [0, 0, 0],
-        [1, 0, 0],
-        [0, 0.5, 0],
-        [0, 1, 1],
-        [1, 1, 1],
-        [0, 0.5, 1]
-    ]
-    handle_poses = [
-        [0.02, 0.02, 0.02],
-        [-0.02, 0.02, 0.02],
-        [0.02, 0, 0.02],
-        [0.02, -0.02, -0.02],
-        [-0.02, -0.02, -0.02],
-        [0.02, 0, -0.02]
-    ]
     base_poses, handle_poses = optimal6()
     # Store frames for the video
     frames = []
-
-    for frame in range(num_frames-1):
+    frame = 0
+    max_frame = 100
+    current_pose = initial_pose
+    current_velocity = numpy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    error = target_pose - current_pose
+    while frame < max_frame or not ((error@error.T) > (0.01)**2):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
@@ -66,15 +34,32 @@ def plot_3d_video_with_imageio(pose_array, force_array, dt, output_filename="3d_
         ax.set_ylabel("Y-axis")
         ax.set_zlabel("Z-axis")
 
-        ax.set_title(f"Frame {frame + 1}/{num_frames}")
-        T = pose_array[:, frame].T
+        ax.set_title(f"Frame {frame + 1} \n Error {numpy.round(error, 2)}")
+        T = current_pose[0:3]
+        RX = current_pose[3]
+        RY = current_pose[4]
+        RZ = current_pose[5]
+
+        kP = 2*numpy.array([1, 1, 1, 0.1, 0.1, 0.1])
+        kD = 3*numpy.array([1, 1, 1, 0.1, 0.1, 0.1])
+
+        desired_forces = kP * error - kD * current_velocity
         # print("DUNGA", T, T.size)
-        RX, RY, RZ = 0, 0, 0  # Static rotations
-        tensions, _, _, _ = force_kinematics(T, RX, RY, RZ, force_array[:, frame], MX([0, 0, 0]), 10, 1)
+        # RX, RY, RZ = 0, 0, 0  # Static rotations
+        tensions, f, t, cost = force_kinematics(T, RX, RY, RZ, desired_forces[0:3], desired_forces[3:6], 10, 1)
         transformed_poses = transform_handle_poses(T, RX, RY, RZ, handle_poses)
+        print("Frame:", frame)
+        print("Error",  error@error.T)
+        print("Force Error:", (desired_forces[0:3]-f))
+        print("Infeasibility:", cost)
+        print(current_pose, current_velocity)
+        current_pose += current_velocity * dt
+        current_velocity[0:3] += f/mass * dt
+        current_velocity[3:6] += t/mass * dt
+        error = target_pose - current_pose
 
         # Normalize tensions for color mapping
-        norm = plt.Normalize(vmin=numpy.min(force_array), vmax=numpy.max(force_array))
+        norm = plt.Normalize(vmin=numpy.min(tensions), vmax=numpy.max(tensions))
         colors = plt.cm.viridis(norm(tensions))
 
         for i, (base, handle) in enumerate(zip(base_poses, transformed_poses)):
@@ -109,14 +94,14 @@ def plot_3d_video_with_imageio(pose_array, force_array, dt, output_filename="3d_
         # Append the frame
         frames.append(image)
 
+        frame = frame + 1
 
     # Save the video using imageio
     imageio.mimsave(output_filename, frames, fps=int(1 / dt))
 
 
 if __name__ == "__main__":
-    positions, forces, dt = generateCircle(0.3, 0, 1, 50, 10)
-    print("Generated Poses:\n", positions)
-    print("Generated Forces:\n", forces)
-    print("Time Step (dt):", dt)
-    plot_3d_video_with_imageio(positions, forces, dt)
+    initial_pose = numpy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    final_pose = numpy.array([0.2, 0.1, -0.2, 0, 0, 0])
+    mass = 0.2
+    plot_3d_video_with_imageio(initial_pose, final_pose, mass, 0.05)

@@ -4,22 +4,70 @@ import numpy
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+def genPose(angle, r, z):
+    angle = angle*pi/180
+    return [np.cos(angle)*r, np.sin(angle)*r ,z]
+
+base_height = np.sqrt(3)/2
+handle_height = 0.2/2
 base_attachment_poses = [
-    [0, 0, 0],
-    [1, 0, 0],
-    [0, 0.5, 0],
-    [0, 1, 1],
-    [1, 1, 1],
-    [0, 0.5, 1]
+    genPose(0, 1, -base_height),
+    genPose(120, 1, -base_height),
+    genPose(240, 1, -base_height),
+    genPose(60, 1, base_height),
+    genPose(180, 1, base_height),
+    genPose(300, 1, base_height)
 ]
 handle_attachment_poses = [
-    [0.02, 0.02, 0.02],
-    [-0.02, 0.02, 0.02],
-    [0.02, 0, 0.02],
-    [0.02, -0.02, -0.02],
-    [-0.02, -0.02, -0.02],
-    [0.02, 0, -0.02],
+    genPose(30, 0.2, handle_height),
+    genPose(150, 0.2, handle_height),
+    genPose(270, 0.2, handle_height),
+    genPose(30, 0.2, -handle_height),
+    genPose(150, 0.2, -handle_height),
+    genPose(270, 0.2, -handle_height)
 ]
+def optimal6():
+    base = [
+        genPose(0, 1, -base_height),
+        genPose(120, 1, -base_height),
+        genPose(240, 1, -base_height),
+        genPose(60, 1, base_height),
+        genPose(180, 1, base_height),
+        genPose(300, 1, base_height)
+    ]
+    handle = [
+        genPose(30, 0.2, handle_height),
+        genPose(150, 0.2, handle_height),
+        genPose(270, 0.2, handle_height),
+        genPose(30, 0.2, -handle_height),
+        genPose(150, 0.2, -handle_height),
+        genPose(270, 0.2, -handle_height)
+    ]
+    return base, handle
+def optimal8():
+    base = [
+        genPose(45, 1, -base_height),
+        genPose(135, 1, -base_height),
+        genPose(225, 1, -base_height),
+        genPose(315, 1, -base_height),
+        genPose(45, 1, base_height),
+        genPose(135, 1, base_height),
+        genPose(225, 1, base_height),
+        genPose(315, 1, base_height)
+    ]
+    handle = [
+        genPose(0, 0.1, handle_height),
+        genPose(90, 0.1, handle_height),
+        genPose(180, 0., handle_height),
+        genPose(270, 0.1, handle_height),
+        genPose(90, 0.1, -handle_height),
+        genPose(180, 0.1, -handle_height),
+        genPose(270, 0.1, -handle_height),
+        genPose(360, 0.1, -handle_height),
+    ]
+    return base, handle
+
+base_attachment_poses, handle_attachment_poses = optimal6()
 def rotationX(angle):
     RXM = MX.eye(4)
     RXM[1, 1] = cos(angle)
@@ -142,17 +190,19 @@ def force_kinematics(T, RX, RY, RZ, Force, Torque, max_tension, min_tension):
     solver_T = MX.zeros(3)
 
     for i in range(len(base_attachment_poses)):
-        force_vec = unit_vec[i] * tensions[i]
+        force_vec = -unit_vec[i] * tensions[i]
         solver_F += force_vec
         torque_vec = np.cross(MX(handle_attachment_poses[i]), force_vec)
         solver_T += torque_vec
+
+        tension_on_string = np.dot(solver_F, force_vec)
+        problem.subject_to(tensions[i] <= max_tension-tension_on_string)
+        problem.subject_to(tensions[i] >= min_tension-tension_on_string)
     
     error_f = (Force-solver_F)
     error_t = (Torque-solver_T)
-    cost = error_f.T@error_f + error_t.T@error_t
-    for i in range(len(base_attachment_poses)):
-        problem.subject_to(tensions[i] <= max_tension)
-        problem.subject_to(tensions[i] >= min_tension)
+    cost = error_f.T@error_f / (75)**2 + error_t.T@error_t / (5)**2
+
 
     problem.minimize(cost)
     problem.solver('ipopt')
@@ -249,14 +299,14 @@ def plot_3d_strings_with_transformation(tensions, T, RX, RY, RZ):
     plt.show()
 
 if __name__ == "__main__":
-    T = [0.1, 0.3, 0.3]  # Translation vector
-    RX, RY, RZ = MX(0.1), MX(0.2), MX(1.3)  # Rotations in radians
+    T = [0, 0, 0]  # Translation vector
+    RX, RY, RZ = MX(0.1), MX(0.2), MX(0)  # Rotations in radians
 
     cable_lengths = forward_kinematics(MX(T), RX, RY, RZ)
     print("Cable Lengths:", cable_lengths)
     result = inverse_kinematics(cable_lengths)
     print("Solution:", result)
-    tensions, f, t, cost = force_kinematics(MX(T), RX, RY, RZ, MX([0, 0, 0]), MX([0, 0, 0]), 10, 1)
+    tensions, f, t, cost = force_kinematics(MX(T), RX, RY, RZ, MX([0, 0, 9.8]), MX([0, 0, 0]), 10, 2)
     print("Tensions:", tensions, "\n", f, t, cost)
 
     plot_3d_strings_with_transformation(tensions, numpy.array(T), RX, RY, RZ)
